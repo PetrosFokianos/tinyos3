@@ -35,6 +35,7 @@ static inline void initialize_PCB(PCB* pcb)
   pcb->pstate = FREE;
   pcb->argl = 0;
   pcb->args = NULL;
+  pcb->thread_count=0;
 
   for(int i=0;i<MAX_FILEID;i++)
     pcb->FIDT[i] = NULL;
@@ -43,9 +44,21 @@ static inline void initialize_PCB(PCB* pcb)
   rlnode_init(& pcb->exited_list, NULL);
   rlnode_init(& pcb->children_node, pcb);
   rlnode_init(& pcb->exited_node, pcb);
+  rlnode_init(& pcb->ptcb_list, pcb->ptcb_list.ptcb);
   pcb->child_exit = COND_INIT;
 }
 
+static inline void initialize_PTCB(PTCB* ptcb, PTCB* prev){
+  ptcb->argl = ptcb->tcb->owner_pcb->argl;
+  ptcb->args = ptcb->tcb->owner_pcb->args;
+  ptcb->exited=0;
+  ptcb->detached=0;
+  ptcb->exitval=0;
+  rlnode_init(& ptcb->ptcb_list_node, ptcb);
+  ptcb->ptcb_list_node.prev = prev;
+  prev->ptcb_list_node.next = ptcb;
+  ptcb->ptcb_list_node.next = NULL;
+}
 
 static PCB* pcb_freelist;
 
@@ -124,6 +137,16 @@ void start_main_thread()
   Exit(exitval);
 }
 
+void start_main_ptcb(){
+  int exitval;
+
+  Task call =  CURPROC->ptcb_list.ptcb->task;
+  int argl = CURPROC->ptcb_list.ptcb->argl;
+  void* args = CURPROC->ptcb_list.ptcb->args;
+
+  exitval = call(argl,args);
+  Threadexit(exitval);
+}
 
 /*
 	System call to create a new process.
@@ -179,6 +202,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
    */
   if(call != NULL) {
     newproc->main_thread = spawn_thread(newproc, start_main_thread);
+    newproc->ptcb_list.ptcb->tcb = newproc->main_thread;
     wakeup(newproc->main_thread);
   }
 

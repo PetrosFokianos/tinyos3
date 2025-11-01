@@ -100,6 +100,7 @@ enum SCHED_CAUSE {
 typedef struct thread_control_block {
 
 	PCB* owner_pcb; /**< @brief This is null for a free TCB */
+  PTCB* owner_ptcb;
 
 	cpu_context_t context; /**< @brief The thread context */
 	Thread_type type; /**< @brief The type of thread */
@@ -185,6 +186,7 @@ TCB* cur_thread();
 */
 #define NO_TIMEOUT ((TimerDuration)-1)
 
+TCB* spawn_process_thread(PCB* pcb);
 /**
 	@brief Create a new thread.
 

@@ -150,6 +150,19 @@ static void thread_start()
   Initialize and return a new TCB
 */
 
+TCB* spawn_process_thread(PCB* pcb){
+	PTCB *new_ptcb, *cur_ptcb;
+
+
+	cur_ptcb = pcb->ptcb_list.ptcb;
+	//go to last element of ptcb list
+	while(cur_ptcb->ptcb_list_node.next!=NULL);
+		cur_ptcb = cur_ptcb->ptcb_list_node.next;
+
+	cur_ptcb->ptcb_list_node;
+	initialize_PTCB(cur_ptcb->ptcb_list_node.ptcb->ptcb_list_node.next, cur_ptcb->ptcb_list_node.ptcb);
+}
+
 TCB* spawn_thread(PCB* pcb, void (*func)())
 {
 	/* The allocated thread size must be a multiple of page size */
