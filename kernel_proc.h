@@ -66,6 +66,7 @@ typedef struct process_control_block {
 } PCB;
 
 typedef struct process_thread_control_block{
+  PCB* owner;
   TCB* tcb;
   Task task;
   int argl;
@@ -82,7 +83,7 @@ typedef struct process_thread_control_block{
 
 } PTCB;
 
-static inline void initialize_PTCB(PTCB* ptcb, PTCB* prev);
+void initialize_PTCB(PTCB* ptcb);
 /**
   @brief Initialize the process table.
 
@@ -115,6 +116,7 @@ PCB* get_pcb(Pid_t pid);
 */
 Pid_t get_pid(PCB* pcb);
 
+void start_ptcb();
 /** @} */
 
 #endif

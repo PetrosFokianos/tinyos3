@@ -48,16 +48,20 @@ static inline void initialize_PCB(PCB* pcb)
   pcb->child_exit = COND_INIT;
 }
 
-static inline void initialize_PTCB(PTCB* ptcb, PTCB* prev){
-  ptcb->argl = ptcb->tcb->owner_pcb->argl;
-  ptcb->args = ptcb->tcb->owner_pcb->args;
+/*
+Here we will initialize a PCB
+*/
+void initialize_PTCB(PTCB* ptcb){
+  //CURPROC is the PCB that called the init_PTCB and thus the owner of the new PTCB
+  ptcb->owner = CURPROC;
+  ptcb->owner->thread_count++;
+  ptcb->argl = ptcb->owner->argl;
+  ptcb->args = ptcb->owner->args;
   ptcb->exited=0;
   ptcb->detached=0;
   ptcb->exitval=0;
   rlnode_init(& ptcb->ptcb_list_node, ptcb);
-  ptcb->ptcb_list_node.prev = prev;
-  prev->ptcb_list_node.next = ptcb;
-  ptcb->ptcb_list_node.next = NULL;
+  rlist_push_back(& ptcb->owner->ptcb_list,& ptcb->ptcb_list_node);
 }
 
 static PCB* pcb_freelist;
@@ -136,16 +140,33 @@ void start_main_thread()
   exitval = call(argl,args);
   Exit(exitval);
 }
-
-void start_main_ptcb(){
+/*
+  This function initializes the first ptcb
+*/
+void start_ptcb(){
   int exitval;
+  PTCB* curPTCB;
 
-  Task call =  CURPROC->ptcb_list.ptcb->task;
-  int argl = CURPROC->ptcb_list.ptcb->argl;
-  void* args = CURPROC->ptcb_list.ptcb->args;
+  /*
+  curPTCB seeks through all PTCBs increasing the dependency count by one until it finds the last element
+  The last element is also the newest added element (That means the new PTCB we just initiated)
+  */
+  curPTCB = CURPROC->ptcb_list.next->ptcb;
+
+  while(curPTCB->ptcb_list_node.next!=NULL){
+    curPTCB->refcount++;
+    curPTCB = curPTCB->ptcb_list_node.next->ptcb;
+  }
+
+  //reset last element dependency counter to 0
+  curPTCB->refcount = 0;
+  //initialize last ptcb with the thread task
+  Task call =  curPTCB->task;
+  int argl = curPTCB->argl;
+  void* args = curPTCB->args;
 
   exitval = call(argl,args);
-  Threadexit(exitval);
+  ThreadExit(exitval);
 }
 
 /*
@@ -154,6 +175,7 @@ void start_main_ptcb(){
 Pid_t sys_Exec(Task call, int argl, void* args)
 {
   PCB *curproc, *newproc;
+  PTCB *newthread=NULL;
   
   /* The new process PCB */
   newproc = acquire_PCB();
@@ -201,8 +223,14 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     the initialization of the PCB.
    */
   if(call != NULL) {
+    //spawns initial thread
     newproc->main_thread = spawn_thread(newproc, start_main_thread);
-    newproc->ptcb_list.ptcb->tcb = newproc->main_thread;
+
+    //initializes first PTCB
+    initialize_PTCB(newthread);
+
+    //passes spawned thread into PTCB
+    newthread->tcb = newproc->main_thread;
     wakeup(newproc->main_thread);
   }
 
