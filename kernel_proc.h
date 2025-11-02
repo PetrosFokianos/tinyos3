@@ -116,7 +116,7 @@ PCB* get_pcb(Pid_t pid);
 */
 Pid_t get_pid(PCB* pcb);
 
-void start_ptcb();
+void start_next_thread();
 /** @} */
 
 #endif

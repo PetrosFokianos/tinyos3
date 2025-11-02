@@ -146,9 +146,9 @@ void start_main_thread()
 /*
   This function initializes the first ptcb
 */
-void start_ptcb(){
+void start_next_thread(){
   int exitval;
-  PTCB* curPTCB;
+  PTCB* curPTCB = malloc(sizeof(*curPTCB));
 
   /*
   curPTCB seeks through all PTCBs increasing the dependency count by one until it finds the last element
@@ -162,11 +162,11 @@ void start_ptcb(){
   }
 
   //reset last element dependency counter to 0
-  curPTCB->refcount = 0;
+  cur_thread()->owner_ptcb->refcount = 0;
   //initialize last ptcb with the thread task
-  Task call =  curPTCB->task;
-  int argl = curPTCB->argl;
-  void* args = curPTCB->args;
+  Task call =  cur_thread()->owner_ptcb->task;
+  int argl = cur_thread()->owner_ptcb->argl;
+  void* args = cur_thread()->owner_ptcb->args;
 
   exitval = call(argl,args);
   ThreadExit(exitval);
