@@ -49,14 +49,17 @@ static inline void initialize_PCB(PCB* pcb)
 }
 
 /*
-Here we will initialize a PCB
+Here we will initialize a PTCB
 */
-void initialize_PTCB(PTCB* ptcb){
-  //CURPROC is the PCB that called the init_PTCB and thus the owner of the new PTCB
-  ptcb->owner = CURPROC;
+void initialize_PTCB(TCB* tcb){
+  PTCB* ptcb = malloc(sizeof(*ptcb));
+  ptcb->owner = tcb->owner_pcb;      
+  ptcb->tcb = tcb;
+  tcb->owner_ptcb = ptcb;
   ptcb->owner->thread_count++;
   ptcb->argl = ptcb->owner->argl;
   ptcb->args = ptcb->owner->args;
+  ptcb->task = ptcb->owner->main_task;
   ptcb->exited=0;
   ptcb->detached=0;
   ptcb->exitval=0;
@@ -175,7 +178,6 @@ void start_ptcb(){
 Pid_t sys_Exec(Task call, int argl, void* args)
 {
   PCB *curproc, *newproc;
-  PTCB *newthread=NULL;
   
   /* The new process PCB */
   newproc = acquire_PCB();
@@ -227,10 +229,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     newproc->main_thread = spawn_thread(newproc, start_main_thread);
 
     //initializes first PTCB
-    initialize_PTCB(newthread);
-
-    //passes spawned thread into PTCB
-    newthread->tcb = newproc->main_thread;
+    initialize_PTCB(newproc->main_thread);
     wakeup(newproc->main_thread);
   }
 

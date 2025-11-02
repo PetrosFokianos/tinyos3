@@ -8,17 +8,14 @@
   */
 Tid_t sys_CreateThread(Task task, int argl, void* args)
 {
-  PTCB* newPTCB = NULL;
+  PTCB* newPTCB = malloc(sizeof(*newPTCB));
+  TCB* newTCB = spawn_thread(CURPROC, start_ptcb);
 
-
-  initialize_PTCB(newPTCB);
-  newPTCB->task = task;
-  newPTCB->argl = argl;
-  newPTCB->args = args;
-  newPTCB->tcb = spawn_thread(CURPROC, start_ptcb);
-
-  
-
+  initialize_PTCB(newTCB);
+  newTCB->owner_ptcb->task = task;
+  newTCB->owner_ptcb->argl = argl;
+  newTCB->owner_ptcb->args = args;
+  wakeup(newTCB);
 
 	return NOTHREAD;
 }
