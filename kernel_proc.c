@@ -156,7 +156,7 @@ void start_next_thread(){
   */
   curPTCB = CURPROC->ptcb_list.next->ptcb;
 
-  while(curPTCB->ptcb_list_node.next!=NULL){
+  while(curPTCB->ptcb_list_node.next->ptcb!=NULL){
     curPTCB->refcount++;
     curPTCB = curPTCB->ptcb_list_node.next->ptcb;
   }
