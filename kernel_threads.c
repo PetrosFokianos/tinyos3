@@ -38,17 +38,24 @@ int sys_ThreadJoin(Tid_t tid, int* exitval)
   if(tid == NOTHREAD || rlist_find(&CURPROC->ptcb_list, ptcb, NULL)==NULL){
 	  return -1;
   }
-  else if (ptcb->exited==1 || ptcb->detached==1 || ptcb == cur_thread()->owner_ptcb){
+  else if (ptcb->detached==1 || ptcb == cur_thread()->owner_ptcb){
     return -1;
   }
   else{
+    ptcb->refcount++;
     while(ptcb->exited==0){
       kernel_wait(&ptcb->exit_cv,SCHED_USER);
       if(ptcb->detached==1)
-        return -1;
+          return -1;
     }
-    exitval = &ptcb->exitval;
+    ptcb->refcount--;
   }
+  if(exitval!=NULL){
+ *exitval = ptcb->exitval;
+  }
+  if(ptcb->refcount==0)
+  rlist_remove(&ptcb->ptcb_list_node);
+ 
   return 0;
  
 }
@@ -82,7 +89,6 @@ void sys_ThreadExit(int exitval)
   PCB* curproc = CURPROC;
   TCB* tcb = cur_thread(); /* obtain cur tcb */
   PTCB* ptcb = tcb->owner_ptcb;  /*obtain ptcb*/
-
 
   if(curproc ->thread_count == 1) { /*no ptcbs left in the current process*/
     if(get_pid(curproc)==1) {
@@ -133,23 +139,19 @@ void sys_ThreadExit(int exitval)
       curproc->FIDT[i] = NULL;
     }
   }
-  if(curproc ->thread_count != 1){
+
     /* Disconnect my main_thread */
     curproc->main_thread = NULL;
 
     /* Now, mark the process as exited. */
     curproc->pstate = ZOMBIE;
-    }
-    ptcb->tcb = NULL;
 
+  }
     ptcb-> exitval= exitval;
     ptcb-> exited=1; /*makes it exited*/
     curproc->thread_count --;
 
     kernel_broadcast(&ptcb->exit_cv);
-  }
-
-
 
   kernel_sleep(EXITED, SCHED_USER);
 }

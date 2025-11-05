@@ -155,7 +155,7 @@ void start_next_thread(){
   void* args = cur_thread()->owner_ptcb->args;
 
   exitval = call(argl,args);
-  ThreadExit(exitval);
+  sys_ThreadExit(exitval);
 }
 
 /*
@@ -330,8 +330,7 @@ void sys_Exit(int exitval)
   /* First, store the exit status */
   curproc->exitval = exitval;
 
-
-  ThreadExit(exitval);
+  sys_ThreadExit(exitval);
 }
 
 
