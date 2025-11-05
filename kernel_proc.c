@@ -148,21 +148,7 @@ void start_main_thread()
 */
 void start_next_thread(){
   int exitval;
-  PTCB* curPTCB = malloc(sizeof(*curPTCB));
 
-  /*
-  curPTCB seeks through all PTCBs increasing the dependency count by one until it finds the last element
-  The last element is also the newest added element (That means the new PTCB we just initiated)
-  */
-  curPTCB = CURPROC->ptcb_list.next->ptcb;
-
-  while(curPTCB->ptcb_list_node.next->ptcb!=NULL){
-    curPTCB->refcount++;
-    curPTCB = curPTCB->ptcb_list_node.next->ptcb;
-  }
-
-  //reset last element dependency counter to 0
-  cur_thread()->owner_ptcb->refcount = 0;
   //initialize last ptcb with the thread task
   Task call =  cur_thread()->owner_ptcb->task;
   int argl = cur_thread()->owner_ptcb->argl;
@@ -344,70 +330,9 @@ void sys_Exit(int exitval)
   /* First, store the exit status */
   curproc->exitval = exitval;
 
-  /* 
-    Here, we must check that we are not the init task. 
-    If we are, we must wait until all child processes exit. 
-   */
-  if(get_pid(curproc)==1) {
 
-    while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
-
-  } else {
-
-    /* Reparent any children of the exiting process to the 
-       initial task */
-    PCB* initpcb = get_pcb(1);
-    while(!is_rlist_empty(& curproc->children_list)) {
-      rlnode* child = rlist_pop_front(& curproc->children_list);
-      child->pcb->parent = initpcb;
-      rlist_push_front(& initpcb->children_list, child);
-    }
-
-    /* Add exited children to the initial task's exited list 
-       and signal the initial task */
-    if(!is_rlist_empty(& curproc->exited_list)) {
-      rlist_append(& initpcb->exited_list, &curproc->exited_list);
-      kernel_broadcast(& initpcb->child_exit);
-    }
-
-    /* Put me into my parent's exited list */
-    rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
-    kernel_broadcast(& curproc->parent->child_exit);
-
-  }
-
-  assert(is_rlist_empty(& curproc->children_list));
-  assert(is_rlist_empty(& curproc->exited_list));
-
-
-  /* 
-    Do all the other cleanup we want here, close files etc. 
-   */
-
-  /* Release the args data */
-  if(curproc->args) {
-    free(curproc->args);
-    curproc->args = NULL;
-  }
-
-  /* Clean up FIDT */
-  for(int i=0;i<MAX_FILEID;i++) {
-    if(curproc->FIDT[i] != NULL) {
-      FCB_decref(curproc->FIDT[i]);
-      curproc->FIDT[i] = NULL;
-    }
-  }
-
-  /* Disconnect my main_thread */
-  curproc->main_thread = NULL;
-
-  /* Now, mark the process as exited. */
-  curproc->pstate = ZOMBIE;
-
-  /* Bye-bye cruel world */
-  kernel_sleep(EXITED, SCHED_USER);
+  ThreadExit(exitval);
 }
-
 
 
 Fid_t sys_OpenInfo()
