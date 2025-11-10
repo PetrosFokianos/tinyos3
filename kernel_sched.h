@@ -5,6 +5,7 @@
 
 #ifndef __KERNEL_SCHED_H
 #define __KERNEL_SCHED_H
+#define QUEUE_NUM 5
 
 /**
   @file kernel_sched.h
@@ -101,6 +102,7 @@ typedef struct thread_control_block {
 
 	PCB* owner_pcb; /**< @brief This is null for a free TCB */
   PTCB* owner_ptcb;
+  int priority;
 
 	cpu_context_t context; /**< @brief The thread context */
 	Thread_type type; /**< @brief The type of thread */
@@ -272,6 +274,10 @@ void run_scheduler(void);
    This function is called during kernel initialization.
  */
 void initialize_scheduler(void);
+
+void change_priority(TCB* tcb);
+
+void boost_priority(void);
 
 /**
   @brief Quantum (in microseconds) 
