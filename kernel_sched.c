@@ -12,7 +12,8 @@
 #endif
 
 static int yield_counter=0;
-#define N 50
+/*Number of yields called before rearanging the priority*/
+#define N 500
 
 /********************************************
 	
@@ -272,7 +273,7 @@ static void sched_register_timeout(TCB* tcb, TimerDuration timeout)
 static void sched_queue_add(TCB* tcb)
 {
 	/* Insert at the correct priority list */
-	rlist_push_back(&SCHED[tcb->priority], &tcb->sched_node); /*insert tcb at the end of the selected queue)*/
+	rlist_push_back(&SCHED[tcb->priority], &tcb->sched_node);
 
 	/* Restart possibly halted cores */
 	cpu_core_restart_one();
@@ -330,11 +331,16 @@ static void sched_wakeup_expired_timeouts()
 */
 static TCB* sched_queue_select(TCB* current)
 {
-	/* Get the head of the SCHED list */
+	/* 
+	Runs through all lists from the highest to lowest priority until a tcb is found.
+	When a list is empty, we check the next list in line (one priority lower)
+	*/
 	int i = 0;
 	while(is_rlist_empty(&SCHED[i]) && i < QUEUE_NUM-1){
 		i++;
 	}
+
+	/*i has been set to the list with the first tcb found in the highest possible priority*/
 	rlnode* sel = rlist_pop_front(&SCHED[i]);
 
 
@@ -433,13 +439,15 @@ void yield(enum SCHED_CAUSE cause)
 	current->last_cause = current->curr_cause;
 	current->curr_cause = cause;
 
+	/*Adjust priority of current yielded thread depending on the SCHED CAUSE*/
     change_priority(current);
 
-	 yield_counter++; //increase yield_count by 1
-	 if(yield_counter >= N){   /*every N times we call yield , we boost the priority */
+	 yield_counter++; 			/*increase yield_count by 1*/
+	 if(yield_counter >= N){   	/*every N times we call yield , priority is boosted */
 		boost_priority();
-		yield_counter=0; /* initialise counter again*/
+		yield_counter=0; 		/* initialize counter again*/
 	 }
+
 	/* Wake up threads whose sleep timeout has expired */
 	sched_wakeup_expired_timeouts();
 	/* Get next */
@@ -532,7 +540,7 @@ static void idle_thread()
 }
 
 /*
-  Initialize the scheduler queue
+  Initialize the scheduler queues
  */
 void initialize_scheduler()
 {
@@ -577,6 +585,20 @@ void run_scheduler()
 	cpu_interrupt_handler(ICI, NULL);
 }
 
+/*
+	Change the priority of the thread according to the SCHED_CAUSE argument called in yield
+
+	Highest priority is marked with 0 and lowest with QUEUE_NUM-1
+	By increasing int priority we lower the priority and vise versa
+
+	When SCHED_CAUSE is:
+	SCHED_QUANTUM 	| 	lower priority by 1
+	SCHED_IO 		|	increase priority by 1
+	SCHED_MUTEX		|	lower priority by 1	(only if previous cause was also SCHED_MUTEX)
+	other calls		|	do nothing
+
+	priority is directly linked with the queue's array index thus is limited between 0 and QUEUENUM-1
+*/
 void change_priority(TCB* tcb){
 	switch (tcb->curr_cause){
 		case SCHED_QUANTUM:
@@ -590,7 +612,7 @@ void change_priority(TCB* tcb){
 		case SCHED_MUTEX:
 			if(tcb->curr_cause==tcb->last_cause){
 				if(tcb->priority<QUEUE_NUM-1)
-				tcb->priority++;     /*decrease priority */
+				tcb->priority++;     
 			}
 			break;
 		default:
@@ -599,7 +621,11 @@ void change_priority(TCB* tcb){
 }
 
 
-
+/*
+	Boosts all threads one priority higher
+	
+	If a thread is already in the highest priority, boost does nothing
+*/
 void boost_priority(){
 	rlnode* p;
 	for(int i=1;i<QUEUE_NUM;i++){
@@ -608,11 +634,7 @@ void boost_priority(){
 				p->tcb->priority--;  /*increase priority by 1*/
 		       rlist_push_back(&SCHED[p->tcb->priority],&p->tcb->sched_node);	
 		}
-	  
 	}
-
-
-
 }
 
 

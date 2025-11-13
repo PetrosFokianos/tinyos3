@@ -5,7 +5,7 @@
 
 #ifndef __KERNEL_SCHED_H
 #define __KERNEL_SCHED_H
-#define QUEUE_NUM 5
+#define QUEUE_NUM 10      /*Number of queues in scheduler | Multilevel Feedback Queue*/
 
 /**
   @file kernel_sched.h
@@ -101,8 +101,8 @@ enum SCHED_CAUSE {
 typedef struct thread_control_block {
 
 	PCB* owner_pcb; /**< @brief This is null for a free TCB */
-  PTCB* owner_ptcb;
-  int priority;
+  PTCB* owner_ptcb; /*Points to the PTCB that is linked with this TCB*/
+  int priority;   /*Here lies the priority of the thread*/
 
 	cpu_context_t context; /**< @brief The thread context */
 	Thread_type type; /**< @brief The type of thread */
@@ -275,8 +275,20 @@ void run_scheduler(void);
  */
 void initialize_scheduler(void);
 
+/**
+  @brief Change TCB priority.
+
+   This function is called by yield and changes the TCB's priority
+   depending on the SCHED_CAUSE.
+ */
 void change_priority(TCB* tcb);
 
+/**
+  @brief Boost all TCB's priorities.
+
+   This function increases every TCB's priority by one unless the
+   TCB already has the highest possible priority (priority 0).
+ */
 void boost_priority(void);
 
 /**

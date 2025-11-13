@@ -48,9 +48,7 @@ static inline void initialize_PCB(PCB* pcb)
   pcb->child_exit = COND_INIT;
 }
 
-/*
-Here we will initialize a PTCB
-*/
+/* Initialize a PTCB*/
 void initialize_PTCB(TCB* tcb){
   PTCB* ptcb = malloc(sizeof(*ptcb));
   ptcb->owner = tcb->owner_pcb;      
@@ -143,8 +141,12 @@ void start_main_thread()
   exitval = call(argl,args);
   Exit(exitval);
 }
+
 /*
-  This function initializes the first ptcb
+  This function is similar to start_main_thread and is
+  used as an argument to spawn inside ThreadCreate, to
+  execute the next thread of the PCB (thread can't be the
+  first (main) thread).
 */
 void start_next_thread(){
   int exitval;
@@ -214,7 +216,7 @@ Pid_t sys_Exec(Task call, int argl, void* args)
     //spawns initial thread
     newproc->main_thread = spawn_thread(newproc, start_main_thread);
 
-    //initializes first PTCB
+    //initializes first PTCB and links it to initial thread
     initialize_PTCB(newproc->main_thread);
     wakeup(newproc->main_thread);
   }
@@ -321,7 +323,10 @@ Pid_t sys_WaitChild(Pid_t cpid, int* status)
 
 }
 
-
+/*
+  Exits thread and/or process if there is
+  one thread remaining
+*/
 void sys_Exit(int exitval)
 {
 

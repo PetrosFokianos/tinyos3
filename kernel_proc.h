@@ -60,30 +60,43 @@ typedef struct process_control_block {
 
   FCB* FIDT[MAX_FILEID];  /**< @brief The fileid table of the process */
 
-  rlnode ptcb_list;
-  int thread_count;
+  rlnode ptcb_list;       /*Head of the PTCB list*/
+  int thread_count;       /*Number of total threads that run under this PCB*/
 
 } PCB;
 
+/**
+  @brief Process Thread Control Block.
+
+  This structure holds all information pertaining to a process thread.
+ */
 typedef struct process_thread_control_block{
-  PCB* owner;
-  TCB* tcb;
-  Task task;
-  int argl;
-  void* args;
+  PCB* owner;   /*Points to the parent process*/
+  TCB* tcb;     /*Points to the assigned thread of the TCB*/
+  Task task;    /*Task that tcb will run*/
+  int argl;     /*argl of Task*/
+  void* args;   /*args of Task*/
 
-  int exitval;
+  int exitval;  /*exitval of thread*/
 
-  int exited;
-  int detached;
-  CondVar exit_cv;
+  int exited;   /*exited status of thread. =1 if thread is exited*/
+  int detached; /*detached status of thread. =1 if thread is detached*/
+  CondVar exit_cv;  /*Condition variable used to keep waiting threads*/
 
-  int refcount;
-  rlnode ptcb_list_node;
+  int refcount;           /*Number of threads waiting to join*/
+  rlnode ptcb_list_node;  /*PTCB list node*/
 
 } PTCB;
 
+
+/**
+  @brief Initialize the process control table.
+
+  This function is called after the spawn of a thread, to initialize
+  any data structures related to thread creation.
+*/
 void initialize_PTCB(TCB* tcb);
+
 /**
   @brief Initialize the process table.
 
@@ -116,6 +129,13 @@ PCB* get_pcb(Pid_t pid);
 */
 Pid_t get_pid(PCB* pcb);
 
+/**
+  @brief Start next thread.
+
+  This function is similar to start_main_thread and is used to
+  start the next thread (not the first one of the PCB). Provided
+  as an argument inside ThreadCreate.
+*/
 void start_next_thread();
 /** @} */
 

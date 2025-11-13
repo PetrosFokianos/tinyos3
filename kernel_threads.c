@@ -90,55 +90,55 @@ void sys_ThreadExit(int exitval)
   TCB* tcb = cur_thread(); /* obtain cur tcb */
   PTCB* ptcb = tcb->owner_ptcb;  /*obtain ptcb*/
 
-  if(curproc ->thread_count == 1) { /*no ptcbs left in the current process*/
+  if(curproc ->thread_count == 1) {      /*Last remaining Thread. Handle PCB termination*/
     if(get_pid(curproc)==1) {
 
-    while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
+      while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
 
-  }else{
+    }else{                                  
 
-    /* Reparent any children of the exiting process to the 
-       initial task */
-    PCB* initpcb = get_pcb(1);
-    while(!is_rlist_empty(& curproc->children_list)) {
-      rlnode* child = rlist_pop_front(& curproc->children_list);
-      child->pcb->parent = initpcb;
-      rlist_push_front(& initpcb->children_list, child);
+      /* Reparent any children of the exiting process to the 
+        initial task */
+      PCB* initpcb = get_pcb(1);
+      while(!is_rlist_empty(& curproc->children_list)) {
+        rlnode* child = rlist_pop_front(& curproc->children_list);
+        child->pcb->parent = initpcb;
+        rlist_push_front(& initpcb->children_list, child);
+      }
+
+      /* Add exited children to the initial task's exited list 
+        and signal the initial task */
+      if(!is_rlist_empty(& curproc->exited_list)) {
+        rlist_append(& initpcb->exited_list, &curproc->exited_list);
+        kernel_broadcast(& initpcb->child_exit);
+      }
+
+      /* Put me into my parent's exited list */
+      rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
+      kernel_broadcast(& curproc->parent->child_exit);
     }
 
-    /* Add exited children to the initial task's exited list 
-       and signal the initial task */
-    if(!is_rlist_empty(& curproc->exited_list)) {
-      rlist_append(& initpcb->exited_list, &curproc->exited_list);
-      kernel_broadcast(& initpcb->child_exit);
+      assert(is_rlist_empty(& curproc->children_list));
+    assert(is_rlist_empty(& curproc->exited_list));
+
+
+    /* 
+      Do all the other cleanup we want here, close files etc. 
+    */
+
+    /* Release the args data */
+    if(curproc->args) {
+      free(curproc->args);
+      curproc->args = NULL;
     }
 
-    /* Put me into my parent's exited list */
-    rlist_push_front(& curproc->parent->exited_list, &curproc->exited_node);
-    kernel_broadcast(& curproc->parent->child_exit);
-  }
-
-    assert(is_rlist_empty(& curproc->children_list));
-  assert(is_rlist_empty(& curproc->exited_list));
-
-
-  /* 
-    Do all the other cleanup we want here, close files etc. 
-   */
-
-  /* Release the args data */
-  if(curproc->args) {
-    free(curproc->args);
-    curproc->args = NULL;
-  }
-
-  /* Clean up FIDT */
-  for(int i=0;i<MAX_FILEID;i++) {
-    if(curproc->FIDT[i] != NULL) {
-      FCB_decref(curproc->FIDT[i]);
-      curproc->FIDT[i] = NULL;
+    /* Clean up FIDT */
+    for(int i=0;i<MAX_FILEID;i++) {
+      if(curproc->FIDT[i] != NULL) {
+        FCB_decref(curproc->FIDT[i]);
+        curproc->FIDT[i] = NULL;
+      }
     }
-  }
 
     /* Disconnect my main_thread */
     curproc->main_thread = NULL;
@@ -146,9 +146,10 @@ void sys_ThreadExit(int exitval)
     /* Now, mark the process as exited. */
     curproc->pstate = ZOMBIE;
 
-  }
+  } /*terminate tcb and clean PTCB*/
     ptcb-> exitval= exitval;
     ptcb-> exited=1; /*makes it exited*/
+    ptcb-> tcb = NULL;
     curproc->thread_count --;
 
     kernel_broadcast(&ptcb->exit_cv);
