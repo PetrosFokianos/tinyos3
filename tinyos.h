@@ -49,6 +49,8 @@ typedef int Fid_t;
    Only values 0 to MAX_FILEID-1 are legal for file descriptors. */
 #define MAX_FILEID 16
 
+#define PIPE_BUFFER_SIZE 1000
+
 /** @brief The invalid file id. */
 #define NOFILE  (-1)
 
