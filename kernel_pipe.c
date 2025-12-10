@@ -26,12 +26,10 @@ int sys_Pipe(pipe_t* pipe)
   
 	Fid_t fid[2];
 
-	if(!FCB_reserve(2,fid,fd)) {
+	if(!FCB_reserve(2,fid,fd)) 
     return -1;
-  }
+  
 	
-  	CURPROC->FIDT[fid[0]] = fd[0];
-	CURPROC->FIDT[fid[1]] = fd[1];
 
 	pipe_cb* pipe_control_block = (pipe_cb*)malloc(sizeof(pipe_cb));
 	fd[0]->streamobj = pipe_control_block;
@@ -40,10 +38,11 @@ int sys_Pipe(pipe_t* pipe)
 	pipe_control_block->writer = fd[1];
 	pipe_control_block->r_position = 0;
 	pipe_control_block->w_position = 0;
+  pipe_control_block->data_size = 0;
 	pipe_control_block->has_data = COND_INIT;
 	pipe_control_block->has_space = COND_INIT;
 
-  	fd[0]->streamfunc = &reader_file_ops;
+  fd[0]->streamfunc = &reader_file_ops;
 	fd[1]->streamfunc = &writer_file_ops;
 
 	pipe->read = fid[0];
@@ -63,12 +62,13 @@ int pipe_write(void* pipecb_t, const char *buf, unsigned int n)
 	
 	for(int i=0 ; i<n ; i++){
 		while((p->w_position+1)%PIPE_BUFFER_SIZE == p->r_position)
-			kernel_wait(&p->has_space, SCHED_USER);
+			kernel_wait(&p->has_space, SCHED_PIPE);
 		p->BUFFER[(p->w_position)%PIPE_BUFFER_SIZE] = buf[i];
 		p->w_position = (p->w_position+1)%PIPE_BUFFER_SIZE;
+    p->data_size++;
 		kernel_broadcast(&p->has_data);
 		if(p->reader==NULL)
-			return i+1;
+			return -1;
 		
 	}
 
@@ -93,15 +93,18 @@ int pipe_read(void* pipecb_t, char *buf, unsigned int n)
 
 	if(p->reader==NULL)
 		return -1;
+
+  if(p->writer == NULL && p->data_size == 0)
+    return 0;
 	
 	for(int i=0 ; i<n ; i++){
-		while((p->r_position+1)%PIPE_BUFFER_SIZE == p->w_position)
-			kernel_wait(&p->has_data, SCHED_USER);
+		while((p->r_position)%PIPE_BUFFER_SIZE == p->w_position && p->writer!=NULL)
+			kernel_wait(&p->has_data, SCHED_PIPE);
 		buf[i] = p->BUFFER[(p->r_position)%PIPE_BUFFER_SIZE];
 		p->r_position = (p->r_position+1)%PIPE_BUFFER_SIZE;
+    p->data_size--;
 		kernel_broadcast(&p->has_space);
-		if(p->writer==NULL && (p->r_position+1)%PIPE_BUFFER_SIZE == p->w_position){
-			buf[i] = p->BUFFER[(p->r_position+1)%PIPE_BUFFER_SIZE];
+		if(p->writer==NULL && p->data_size<=0){
 			return i+1;
 		}
 	}
