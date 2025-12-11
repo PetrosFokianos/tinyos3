@@ -51,6 +51,7 @@ typedef int Fid_t;
 
 #define PIPE_BUFFER_SIZE 1000
 
+
 /** @brief The invalid file id. */
 #define NOFILE  (-1)
 
@@ -550,7 +551,6 @@ typedef int16_t port_t;
 	@brief the maximum legal port 
 */
 #define MAX_PORT 1023
-
 /**
 	@brief a null value for a port
 */

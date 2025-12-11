@@ -24,7 +24,6 @@ static int yield_counter=0;
 /* Core control blocks */
 CCB cctx[MAX_CORES];
 
-
 /* 
 	The current core's CCB. This must only be used in a 
 	non-preemtpive context.
