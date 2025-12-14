@@ -88,6 +88,10 @@ typedef struct process_thread_control_block{
 
 } PTCB;
 
+typedef struct process_info_control_block{
+  procinfo pinfo;
+  int PCBcursor;
+}procinfo_cb;
 
 /**
   @brief Initialize the process control table.
@@ -138,5 +142,9 @@ Pid_t get_pid(PCB* pcb);
 */
 void start_next_thread();
 /** @} */
+
+int procinfo_read(void* procinfo_t, char* buf, unsigned int size);
+
+int procinfo_close(void* procinfo_t);
 
 #endif

@@ -29,7 +29,7 @@ int sys_Pipe(pipe_t* pipe)
 	if(!FCB_reserve(2,fid,fd)) 
     return -1;
   
-	pipe_cb* pipe_control_block = (pipe_cb*)malloc(sizeof(pipe_cb));
+	pipe_cb* pipe_control_block = xmalloc(sizeof(pipe_cb));
 	fd[0]->streamobj = pipe_control_block;
 	fd[1]->streamobj = pipe_control_block;
 	pipe_control_block->reader = fd[0];

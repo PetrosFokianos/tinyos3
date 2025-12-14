@@ -1,9 +1,7 @@
-
 #include <assert.h>
 #include "kernel_cc.h"
 #include "kernel_proc.h"
 #include "kernel_streams.h"
-
 
 /* 
  The process table and related system calls:
@@ -16,6 +14,14 @@
  */
 
 /* The process table */
+
+static file_ops procinfo_ops = {
+  .Open = NULL,
+  .Read = procinfo_read,
+  .Write = NULL,
+  .Close = procinfo_close
+};
+
 PCB PT[MAX_PROC];
 unsigned int process_count;
 
@@ -339,8 +345,67 @@ void sys_Exit(int exitval)
 }
 
 
-Fid_t sys_OpenInfo()
+int procinfo_read(void* procinfo_t, char* buf, unsigned int size)
 {
-	return NOFILE;
+  procinfo_cb* info = (procinfo_cb*)procinfo_t;
+
+  if(info == NULL)
+    return -1;
+  
+  while(info->PCBcursor< MAX_PROC && (get_pcb(info->PCBcursor)==NULL || get_pcb(info->PCBcursor) == FREE)){
+    info->PCBcursor++;
+  }
+
+  if(info->PCBcursor>=MAX_PROC)
+    return 0;
+
+  PCB* pcb = get_pcb(info->PCBcursor);
+
+
+  info->pinfo.alive = pcb->pstate == ALIVE;
+  info->pinfo.argl = pcb->argl;
+  info->pinfo.main_task = pcb->main_task;
+  info->pinfo.pid = get_pid(pcb);
+  info->pinfo.ppid = get_pid(pcb->parent);
+  info->pinfo.thread_count = pcb->thread_count;
+
+  if(pcb->argl>=PROCINFO_MAX_ARGS_SIZE)
+     memcpy(info->pinfo.args, pcb->args, PROCINFO_MAX_ARGS_SIZE);
+  else
+     memcpy(info->pinfo.args, pcb->args, pcb->argl);
+    
+  memcpy(buf, (char*)&info->pinfo, size);
+  info->PCBcursor++;
+  return size;
 }
 
+int procinfo_close(void* procinfo_t)
+{
+  procinfo_cb* info = (procinfo_cb*)procinfo_t;
+  if(info == NULL)
+    return -1;
+  if(info->PCBcursor>=MAX_PROC)
+  free(info);
+
+  return 0;
+}
+
+
+Fid_t sys_OpenInfo()
+{
+  procinfo_cb* info = xmalloc(sizeof(procinfo_cb));
+
+  Fid_t fid;
+  FCB* procfcb;
+  if(!FCB_reserve(1, &fid, &procfcb))
+    return NOFILE;
+  
+  info->PCBcursor = 1;
+  procfcb->refcount = 0;
+  procfcb->streamobj = info;
+  procfcb->streamfunc = &procinfo_ops;
+
+	return fid;
+}
+
+  

@@ -92,7 +92,6 @@ void sys_ThreadExit(int exitval)
 
   if(curproc ->thread_count == 1) {      /*Last remaining Thread. Handle PCB termination*/
     if(get_pid(curproc)==1) {
-
       while(sys_WaitChild(NOPROC,NULL)!=NOPROC);
 
     }else{                                  
@@ -139,6 +138,7 @@ void sys_ThreadExit(int exitval)
         curproc->FIDT[i] = NULL;
       }
     }
+    
 
     /* Disconnect my main_thread */
     curproc->main_thread = NULL;
@@ -149,9 +149,7 @@ void sys_ThreadExit(int exitval)
   } /*terminate tcb and clean PTCB*/
     ptcb-> exitval= exitval;
     ptcb-> exited=1; /*makes it exited*/
-    ptcb-> tcb = NULL;
     curproc->thread_count --;
-
     kernel_broadcast(&ptcb->exit_cv);
 
   kernel_sleep(EXITED, SCHED_USER);
