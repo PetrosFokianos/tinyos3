@@ -49,28 +49,7 @@ int sys_Pipe(pipe_t* pipe)
 	return 0;
 }
 
-            
 
-int pipe_write(void* pipecb_t, const char *buf, unsigned int n)
-{
-	pipe_cb* p = (pipe_cb*)pipecb_t; //take curr pipe
-
-	if(p->reader==NULL || p->writer==NULL)
-		return -1;
-	
-	for(int i=0 ; i<n ; i++){
-		while((p->w_position+1)%PIPE_BUFFER_SIZE == p->r_position)
-			kernel_wait(&p->has_space, SCHED_PIPE);
-		p->BUFFER[(p->w_position)%PIPE_BUFFER_SIZE] = buf[i];
-		p->w_position = (p->w_position+1)%PIPE_BUFFER_SIZE;
-    p->data_size++;
-		kernel_broadcast(&p->has_data);
-		if(p->reader==NULL)
-			return -1;
-		
-	}
-
-	
 	/** Write operation.
 
     Write up to 'size' bytes from 'buf' to the stream 'this'.
@@ -82,8 +61,41 @@ int pipe_write(void* pipecb_t, const char *buf, unsigned int n)
     Possible errors are:
     - There was a I/O runtime problem.
   */
+
+int pipe_write(void* pipecb_t, const char *buf, unsigned int n)
+{
+	pipe_cb* p = (pipe_cb*)pipecb_t; //take curr pipe
+
+	if(p->reader==NULL || p->writer==NULL)
+		return -1;
+	
+	for(int i=0 ; i<n ; i++){
+		while(p->data_size>=PIPE_BUFFER_SIZE-1 || (p->w_position+1)%PIPE_BUFFER_SIZE == p->r_position){
+      	kernel_broadcast(&p->has_data);
+      	kernel_wait(&p->has_space, SCHED_PIPE);
+    }
+    if(p->reader==NULL)
+			return -1;
+		p->BUFFER[(p->w_position)%PIPE_BUFFER_SIZE] = buf[i];
+		p->w_position = (p->w_position+1)%PIPE_BUFFER_SIZE;
+    p->data_size++;
+
+	}
+  kernel_broadcast(&p->has_data);
   return n;
 }
+
+	/** Read operation.
+
+    Read up to 'size' bytes from stream 'this' into buffer 'buf'. 
+    If no data is available, the thread will block, to wait for data.
+    The Read function should return the number of bytes copied into buf, 
+    or -1 on error. The call may return fewer bytes than 'size', 
+    but at least 1. A value of 0 indicates "end of data".
+
+    Possible errors are:
+    - There was a I/O runtime problem.
+  */
 
 int pipe_read(void* pipecb_t, char *buf, unsigned int n)
 {
@@ -96,27 +108,22 @@ int pipe_read(void* pipecb_t, char *buf, unsigned int n)
     return 0;
 	
 	for(int i=0 ; i<n ; i++){
-		while((p->r_position)%PIPE_BUFFER_SIZE == p->w_position && p->writer!=NULL)
-			kernel_wait(&p->has_data, SCHED_PIPE);
+		while((p->data_size<=0 || (p->r_position)%PIPE_BUFFER_SIZE == p->w_position) && p->writer!=NULL){
+      kernel_broadcast(&p->has_space);
+      kernel_wait(&p->has_data, SCHED_PIPE);
+    }
+    if(p->writer==NULL && p->data_size<=0){
+			return i+1;
+		}
 		buf[i] = p->BUFFER[(p->r_position)%PIPE_BUFFER_SIZE];
 		p->r_position = (p->r_position+1)%PIPE_BUFFER_SIZE;
     p->data_size--;
-		kernel_broadcast(&p->has_space);
 		if(p->writer==NULL && p->data_size<=0){
 			return i+1;
 		}
 	}
-	/** Read operation.
 
-    Read up to 'size' bytes from stream 'this' into buffer 'buf'. 
-    If no data is available, the thread will block, to wait for data.
-    The Read function should return the number of bytes copied into buf, 
-    or -1 on error. The call may return fewer bytes than 'size', 
-    but at least 1. A value of 0 indicates "end of data".
-
-    Possible errors are:
-    - There was a I/O runtime problem.
-  */
+  	kernel_broadcast(&p->has_space);
  return n;
 }
 
